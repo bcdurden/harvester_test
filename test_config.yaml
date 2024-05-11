@@ -2,6 +2,9 @@ vm_images:
 - name: ubuntu
   os_type: ubuntu
   url: http://cloud-images.ubuntu.com/releases/jammy/release/ubuntu-22.04-server-cloudimg-amd64.img
+- name: rocky
+  os_type: rocky
+  url: https://dl.rockylinux.org/pub/rocky/9/images/x86_64/Rocky-9-GenericCloud.latest.x86_64.qcow2
 networks:
   - name: services
     config: '{"cniVersion":"0.3.1","name":"services","type":"bridge","bridge":"mgmt-br","promiscMode":true,"vlan":5,"ipam":{}}'
@@ -13,13 +16,20 @@ vms:
     network: host
     default_user: ubuntu
     test_command: "cat /etc/os-release"
+  - name: rocky-test
+    image: rocky
+    network: host
+    default_user: rocky
+    test_command: "cat /etc/os-release"
 
 cluster:
   vm:
     image: ubuntu
 
   control_plane:
-    vip: 10.10.0.5 
+    vip: 10.10.0.9 
+    gateway: 10.10.0.1
+    subnet: 10.10.0.0/24
     
     node_count: 3 
     ipam: static

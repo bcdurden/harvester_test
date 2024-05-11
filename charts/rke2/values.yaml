@@ -28,6 +28,8 @@ control_plane:
   node_disk_gb: 40
 
   vip:                            #! this is the VIP for the Harvester LoadBalancer object, ensure it is a routable IP
+  gateway:
+  subnet:
   ipam: dhcp                      #! this can be dhcp or static, static requires the static ip fields
   static_ip:
     device: enp1s0                #! network device name on your VMs, may differ depending on host OS

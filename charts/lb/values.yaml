@@ -1,0 +1,8 @@
+cluster_name: mycluster
+cluster_namespace: default
+
+control_plane:
+  node_count: 1
+  vip:
+  gateway:
+  subnet:

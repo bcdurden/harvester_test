@@ -77,7 +77,7 @@ for vm in ${VMS}; do
     echo "$vm image is ready"
 done
 
-## Create VMs
+# Create VMs
 echo "Testing VM creation for each image"
 VMS=$(yq '.vms[].name' ${CONFIG_FILE})
 for vm in ${VMS}; do
@@ -118,7 +118,46 @@ for vm in ${VMS}; do
 done
 
 ## Delete VMs
+echo "Cleaning up"
+VMS=$(yq '.vms[].name' ${CONFIG_FILE})
+for vm in ${VMS}; do
+    if kubectl get vm $vm > /dev/null 2>&1; then
+        kubectl delete vm $vm --force || true
+        kubectl get pvc | awk '/'$vm'/{print $1}' | xargs kubectl delete pvc || true
+    fi
+done
 
 ## Create RKE2 cluster
+yq '.cluster' ${CONFIG_FILE} | helm upgrade --install rke2 charts/rke2 -f - --set ssh_pub_key="$PUB_KEY" --wait
+NODE_NAME="mycluster-cp-0"
+VIP=$(yq '.cluster.control_plane.vip' ${CONFIG_FILE})
+echo "Waiting for $NODE_NAME to start"
+until [[ $(kubectl get vm $NODE_NAME -o yaml | yq '.status.ready') == "true" ]]; do printf "."; sleep 5; done
+
+echo "$NODE_NAME has started, waiting for IP to post"
+until [[ $(kubectl get vmi $NODE_NAME -o yaml | yq '.status.interfaces[0].ipAddress') != "null" ]]; do printf "."; sleep 5; done
+IP=$(kubectl get vmi $NODE_NAME -o yaml | yq '.status.interfaces[0].ipAddress')
+echo "IP posted"
+
+# create LB (since harvester has invoked tight coupling on LB for now)
+yq '.cluster' ${CONFIG_FILE} | helm upgrade --install rke2-lb charts/lb -f -
+
+echo "Waiting for Cloud-Init on $NODE_NAME : $IP"
+ssh -i /tmp/test_key -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no ubuntu@${IP} "while [ ! -f /var/lib/cloud/instance/boot-finished ]; do printf '.'; sleep 5; done"
+
+echo "Fetching kubeconfig from $NODE_NAME : $IP"
+ssh -i /tmp/test_key -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no ubuntu@${IP} "sudo cat /etc/rancher/rke2/rke2.yaml" 2> /dev/null | \
+sed "s/127.0.0.1/${VIP}/g" > kube.yaml
+echo "Sleeping to let nodes join"
+sleep 20
+kubectl --kubeconfig kube.yaml get nodes
 
 echo "Tests finished"
+rm -rf ${WORK_DIR}
+
+echo "Check the cluster via: kubectl --kubeconfig kube.yaml get nodes"
+echo ""
+echo "Delete the cluster with: helm delete rke2-lb; helm delete rke2-lb; helm delete rke2"
+echo "Sometimes the loadbalancer fails deletion the first time due to order of operations and helm being kinda dumb about that stuff"
+echo "Also delete the PVCs since Harvester does not auto-clean volumes upon deletion via the CRs:"
+echo "kubectl get pvc | awk '/mycluster/{print $1}' | xargs kubectl delete pvc"
