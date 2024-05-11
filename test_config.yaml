@@ -1,0 +1,37 @@
+vm_images:
+- name: ubuntu
+  os_type: ubuntu
+  url: http://cloud-images.ubuntu.com/releases/jammy/release/ubuntu-22.04-server-cloudimg-amd64.img
+networks:
+  - name: services
+    config: '{"cniVersion":"0.3.1","name":"services","type":"bridge","bridge":"mgmt-br","promiscMode":true,"vlan":5,"ipam":{}}'
+  - name: host
+    config: '{"cniVersion":"0.3.1","name":"host","type":"bridge","bridge":"mgmt-br","promiscMode":true,"ipam":{}}'
+vms:
+  - name: ubuntu-jammy-test
+    image: ubuntu
+    network: host
+    default_user: ubuntu
+    test_command: "cat /etc/os-release"
+
+cluster:
+  vm:
+    image: ubuntu
+
+  control_plane:
+    vip: 10.10.0.5 
+    
+    node_count: 3 
+    ipam: static
+    static_ip:
+      device: enp1s0                
+      gateway: 10.10.0.1
+      dns:
+      - 10.10.0.1
+      pool:
+      - 10.10.0.6/24
+      - 10.10.0.7/24
+      - 10.10.0.8/24
+
+  worker:
+    node_count: 0

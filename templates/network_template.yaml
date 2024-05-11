@@ -1,0 +1,10 @@
+---
+apiVersion: k8s.cni.cncf.io/v1
+kind: NetworkAttachmentDefinition
+metadata:
+  annotations:
+    network.harvesterhci.io/route: '{"mode":"auto","serverIPAddr":"","cidr":"","gateway":""}'
+  name: ${NETWORK_NAME}
+  namespace: default
+spec:
+  config: '${CONFIG}'

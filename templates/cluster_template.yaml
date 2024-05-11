@@ -1,0 +1,25 @@
+system_default_registry: harbor.sienarfleet.systems
+
+vm:
+  image: ubuntu-rke2   
+  qemu_agent_install: false          
+  qemu_agent_enable: true           
+  airgapped_image: true  
+
+control_plane:
+  vip: 10.10.0.5 
+  
+  node_count: 3 
+  ipam: static
+  static_ip:
+    device: enp1s0                
+    gateway: 10.10.0.1
+    dns:
+    - 10.10.0.1
+    pool:
+    - 10.10.0.6/24
+    - 10.10.0.7/24
+    - 10.10.0.8/24
+
+worker:
+  node_count: 0

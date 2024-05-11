@@ -1,0 +1,82 @@
+apiVersion: kubevirt.io/v1
+kind: VirtualMachine
+metadata:
+  namespace: default
+  annotations:
+    harvesterhci.io/volumeClaimTemplates: >-
+      [{"metadata":{"name":"${VM_NAME}-disk-0","annotations":{"harvesterhci.io/imageId":"default/${VM_IMAGE}"}},"spec":{"accessModes":["ReadWriteMany"],"resources":{"requests":{"storage":"20Gi"}},"volumeMode":"Block","storageClassName":"longhorn-${VM_IMAGE}"}}]
+    network.harvesterhci.io/ips: '[]'
+  labels:
+    harvesterhci.io/creator: harvester
+    harvesterhci.io/os: ubuntu
+  name: ${VM_NAME}
+  finalizers:
+    - harvesterhci.io/VMController.UnsetOwnerOfPVCs
+spec:
+  runStrategy: RerunOnFailure
+  template:
+    metadata:
+      annotations: {}
+      labels:
+        harvesterhci.io/vmName: ${VM_NAME}
+    spec:
+      domain:
+        machine:
+          type: ''
+        cpu:
+          cores: 2
+          sockets: 1
+          threads: 4
+        devices:
+          interfaces:
+            - bridge: {}
+              model: virtio
+              name: default
+          disks:
+            - name: disk-0
+              disk:
+                bus: virtio
+              bootOrder: 1
+            - name: cloudinitdisk
+              disk:
+                bus: virtio
+          hostDevices: []
+        resources:
+          limits:
+            memory: 4Gi
+            cpu: '2'
+        features:
+          acpi:
+            enabled: true
+        firmware:
+          bootloader:
+            efi:
+              secureBoot: false
+      evictionStrategy: LiveMigrate
+      hostname: ${VM_NAME}
+      networks:
+        - name: default
+          multus:
+            networkName: default/${NETWORK_NAME}
+      volumes:
+        - name: disk-0
+          persistentVolumeClaim:
+            claimName: ${VM_NAME}-disk-0
+        - name: cloudinitdisk
+          cloudInitNoCloud:
+            userData: |
+              #cloud-config
+              package_update: true
+              packages:
+                - qemu-guest-agent
+              runcmd:
+              - - systemctl
+                - enable
+                - '--now'
+                - qemu-guest-agent.service
+              ssh_authorized_keys: 
+              - ${PUB_KEY}
+
+            networkData: ""
+      affinity: {}
+      terminationGracePeriodSeconds: 120
