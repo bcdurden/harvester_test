@@ -1,0 +1,96 @@
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: harvester-prep
+spec:
+  params:
+  - name: key
+    type: string
+  - name: ip
+    type: string
+  - name: vip
+    type: string
+  - name: ui-password
+    type: string
+    default: rfedrfed8675309
+  - name: prefix
+    type: string
+    default: ""
+  results:
+  - name: kube-config
+    type: object
+    properties:
+      data:
+        type: string
+  workspaces:
+  - name: harvester-workspace
+  sidecars:
+  - image: bcdurden/ubuntu-fulcrum
+    imagePullPolicy: IfNotPresent
+    volumeMounts:
+      - name: $(workspaces.harvester-workspace.volume)
+        mountPath: $(workspaces.harvester-workspace.path)
+      - name: bootstrap-data
+        mountPath: /data
+    script: |
+      sleep 3
+      cp -r /data/* $(workspaces.harvester-workspace.path)/
+      touch "$(workspaces.harvester-workspace.path)/ready"
+  volumes:
+    - hostPath:
+        path: /data
+      name: bootstrap-data
+  steps:
+    - name: configure-password
+      image: bcdurden/ubuntu-fulcrum
+      imagePullPolicy: IfNotPresent
+      script: |
+        #!/bin/sh
+        $(params.prefix)
+        HARVESTER_URL=$(params.vip)
+        printf "\nWaiting for Harvester to be available\n";
+        until [ $(curl -sk --write-out "%{http_code}" --output /dev/null https://$(params.vip)/v3-public | grep 200 | wc -l) = 1 ]; do sleep 10;	printf ".";	done
+
+        printf "\nSetting UI Password!\n";
+        TOKEN=$(curl -sk -X POST https://$(params.vip)/v3-public/localProviders/local?action=login -H 'content-type: application/json' -d '{"username":"admin","password":"admin"}' | jq -r '.token')
+        if [ $? -eq 0 ]; then
+          curl -sk https://$(params.vip)/v3/users?action=changepassword -H 'content-type: application/json' -H "Authorization: Bearer ${TOKEN}" -d '{"currentPassword":"admin","newPassword":"$(params.ui-password)"}'
+          # TODO: handle error case
+
+          printf "\nGetting Token\n";
+          TOKEN=$(curl -sk -X POST https://$(params.vip)/v3-public/localProviders/local?action=login -H 'content-type: application/json' -d '{"username":"admin","password":"$(params.ui-password)"}' | jq -r '.token')
+          printf "\nSetting Telemetry\n";
+          curl -sk https://$(params.vip)/v1/management.cattle.io.settings/telemetry-opt -X PUT -H 'content-type: application/json' -H 'accept: application/json' -H "Authorization: Bearer  ${TOKEN}" -d '{"value":"out"}' > /dev/null 2>&1
+          if $? ; then printf "\nSet successfully!\n"; fi
+        else
+          printf "\nAlready set!\n";
+        fi
+  
+    - name: fetch-kubeconfig
+      image: bcdurden/ubuntu-fulcrum
+      imagePullPolicy: IfNotPresent
+      volumeMounts:
+        - name: bootstrap-data
+          mountPath: /data
+      script: |
+        #!/bin/sh
+        $(params.prefix)
+
+        # wait for workspace to be ready
+        until [ -f $(workspaces.harvester-workspace.path)/ready ]
+        do
+            sleep 5
+        done
+
+        printf "\nGrabbing Harvester kubeconfig!\n";
+        TOKEN=$(curl -sk -X POST https://$(params.vip)/v3-public/localProviders/local?action=login -H 'content-type: application/json' -d '{"username":"admin","password":"$(params.ui-password)"}' | jq -r '.token')
+        curl -sk https://$(params.vip)/v1/management.cattle.io.clusters/local?action=generateKubeconfig -H "Authorization: Bearer ${TOKEN}" -X POST -H 'content-type: application/json' | jq -r .config > $(workspaces.harvester-workspace.path)/config
+        chmod 600 $(workspaces.harvester-workspace.path)/config
+
+        cp $(workspaces.harvester-workspace.path)/config /data/harvester.yaml
+        chmod 600 $(workspaces.harvester-workspace.path)/config
+        chmod 644 /data/harvester.yaml
+        jq --null-input --arg data "$(cat $(workspaces.harvester-workspace.path)/config | base64 -w0)" '.data = $data' | tee $(results.kube-config.path)
+        
+    

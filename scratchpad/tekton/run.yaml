@@ -1,0 +1,22 @@
+---
+apiVersion: tekton.dev/v1beta1
+kind: TaskRun
+metadata:
+  name: harvester-prep-run
+spec:
+  params:
+  - name: key
+    value: "key"
+  - name: ip
+    value: "10.10.0.16"
+  - name: vip
+    value: "10.10.0.15"
+  - name: prefix
+    value: "set -x"
+  - name: ui-password
+    value: "rfedrfed8675309"
+  taskRef:
+    name: harvester-prep
+  workspaces:
+    - name: harvester-workspace 
+      emptyDir: {}      

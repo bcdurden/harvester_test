@@ -1,0 +1,9 @@
+rancher/k3s:v1.27.4-k3s1
+docker.io/library/registry:2
+rancher/mirrored-coredns-coredns:1.10.1
+rancher/mirrored-metrics-server:v0.6.3
+rancher/local-path-provisioner:v0.0.24
+rancher/klipper-helm:v0.8.0-build20230510
+rancher/klipper-lb:v0.4.4
+rancher/mirrored-library-traefik:2.9.10
+rancher/mirrored-pause:3.6

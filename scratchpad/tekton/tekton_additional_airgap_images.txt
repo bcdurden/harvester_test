@@ -1,0 +1,5 @@
+gcr.io/tekton-releases/github.com/tektoncd/pipeline/cmd/entrypoint:v0.52.1
+gcr.io/tekton-releases/github.com/tektoncd/pipeline/cmd/nop:v0.52.1
+gcr.io/tekton-releases/github.com/tektoncd/pipeline/cmd/sidecarlogresults:v0.52.1
+gcr.io/tekton-releases/github.com/tektoncd/pipeline/cmd/workingdirinit:v0.52.1
+cgr.dev/chainguard/busybox
